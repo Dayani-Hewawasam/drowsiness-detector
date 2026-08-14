@@ -1,3 +1,4 @@
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -11,12 +12,20 @@ from datetime import datetime
 EAR_THRESHOLD = 0.25         # Below this = eyes closed
 EAR_CONSEC_FRAMES = 20       # Frames closed before triggering alarm
 MAR_THRESHOLD = 0.6          # Above this = yawning
-ALARM_SOUND_PATH = "alarm.wav"
+ALARM_SOUND_PATH = os.path.join(os.path.dirname(__file__), "alarm.wav")
 LOG_FILE = "drowsiness_log.csv"
 
 # ---------------- SETUP ----------------
-pygame.mixer.init()
-alarm_sound = pygame.mixer.Sound(ALARM_SOUND_PATH)
+try:
+    pygame.mixer.init()
+    alarm_sound = None
+    if os.path.exists(ALARM_SOUND_PATH):
+        alarm_sound = pygame.mixer.Sound(ALARM_SOUND_PATH)
+    else:
+        print(f"Warning: {ALARM_SOUND_PATH} not found. Audio alerts disabled.")
+except Exception as exc:
+    print(f"Warning: audio unavailable ({exc}). Continuing without sound alerts.")
+    alarm_sound = None
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -103,12 +112,14 @@ while True:
                 status_color = (0, 0, 255)
                 if not alarm_on:
                     alarm_on = True
-                    alarm_sound.play(loops=-1)
+                    if alarm_sound is not None:
+                        alarm_sound.play(loops=-1)
                     log_event("drowsiness_detected")
         else:
             counter = 0
             if alarm_on:
-                alarm_sound.stop()
+                if alarm_sound is not None:
+                    alarm_sound.stop()
                 alarm_on = False
             status_text = "Active"
             status_color = (0, 255, 0)
@@ -124,7 +135,8 @@ while True:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     else:
         if alarm_on:
-            alarm_sound.stop()
+            if alarm_sound is not None:
+                alarm_sound.stop()
             alarm_on = False
 
     cv2.putText(frame, status_text, (10, 30),
